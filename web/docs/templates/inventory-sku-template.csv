@@ -1,0 +1,4 @@
+sku,item_name,category,base_unit
+RM-RICE,Rice,raw_material,kg
+SF-SAUCE,Prepared Sauce,semi_finished,kg
+GEN-TISSUE,Tissue,general,each

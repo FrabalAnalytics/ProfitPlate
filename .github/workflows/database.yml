@@ -1,0 +1,47 @@
+name: Database foundation
+on:
+  pull_request:
+    paths: ['web/**', '.github/workflows/database.yml']
+  push:
+    paths: ['web/**', '.github/workflows/database.yml']
+permissions:
+  contents: read
+jobs:
+  postgres:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm run db:test
+      - run: npm run db:test:native
+  supabase:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run db:start
+      - run: npm run db:reset
+      - run: npm run db:lint
+      - run: npm run db:test:local
+      - run: npm run db:test:api
+      - run: node scripts/generate-database-types.mjs --check
+      - if: always()
+        run: npx supabase stop --no-backup

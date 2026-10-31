@@ -1,6 +1,14 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+ProfitPlate's database foundation lives in `supabase/migrations`. Start with the [database workflow](supabase/README.md) and [schema/permissions contract](docs/Database_Foundation.md). Run `npm run db:test` for isolated checks or `npm run db:test:native` for PostgreSQL 17 concurrency checks.
+
 ## Getting Started
+
+Authentication and the first UI slice are implemented. See [Authentication_and_UI.md](docs/Authentication_and_UI.md) for local review, session behavior, hosted Auth settings, browser tests, and remaining UI increments.
+
+Location management is available from **Workspace → Locations**. Owners and admins can add, edit, deactivate, and reactivate locations; other active members can view them. It uses the existing audited database commands and requires no additional migration. Browser checks include the location workflow and phone/desktop layouts.
+
+The **Inventory** workspace includes categories, recipe versions/live costs, opening stock, receipts, transfers, standard-batch production, waste, general usage, CSV sales imports, independent manager approvals, period controls and movement history. [Role workspaces and procurement](docs/Role_Workspaces_and_Procurement.md) adds team onboarding, role dashboards, a central approval queue, master data, purchasing and department requisitions. [First-version reporting](docs/First_Version_Reporting.md) supersedes earlier GM/rollout rules: Operations Manager approval, a separate Administrator, explicit additional duties, physical counts/adjustments, net sales import, COGS/food cost/margin reports, protected report revisions, CSV export and management actions. Read [Operational_Workflows.md](docs/Operational_Workflows.md) for underlying valuation policies. Reversals and release sign-off remain pending; this is a controlled test increment.
 
 First, run the development server:
 

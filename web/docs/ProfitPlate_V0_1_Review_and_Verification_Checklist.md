@@ -54,3 +54,7 @@ All rows below are pending. They supplement, rather than replace, the original e
 6. Attach actual test output, migration version, recovery/rollback notes, unresolved defects, and release sign-off. Do not mark this checklist passed based on design review.
 
 No executable SQL was invented, no application was built, and no deployment was performed during this review.
+
+## Subsequent implementation — 27 October 2026
+
+A new foundation migration and verification tooling now exist. This does not change the historical review status above or mean the original migration was recovered. See [Database_Foundation.md](Database_Foundation.md) for the implemented contract, native PostgreSQL evidence, and remaining Supabase/hosted integration gates. The original release checklist must not be marked fully passed from isolated database tests alone.

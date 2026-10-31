@@ -2,6 +2,12 @@
 
 # dependencies
 /node_modules
+/.npm-cache/
+/.db-test/
+/.tooling/
+__pycache__/
+/playwright-report/
+/test-results/
 /.pnp
 .pnp.*
 .yarn/*
@@ -15,6 +21,7 @@
 
 # next.js
 /.next/
+/.next-e2e/
 /out/
 
 # production
@@ -25,6 +32,7 @@
 *.pem
 
 # debug
+debug.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -32,6 +40,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # vercel
 .vercel

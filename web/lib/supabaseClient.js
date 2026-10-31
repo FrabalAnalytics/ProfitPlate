@@ -11,4 +11,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Connection diagnostics only. Application authentication uses the per-request
+// server client in lib/supabase/server.ts and HttpOnly session cookies.
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+});
