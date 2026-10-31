@@ -11,6 +11,7 @@ export function WorkspaceNav({
     canReadVendors: boolean;
     isManager: boolean;
     canReports?: boolean;
+    canAudit?: boolean;
   };
 }) {
   const pathname = usePathname();
@@ -24,6 +25,7 @@ export function WorkspaceNav({
           ?.removeAttribute("open")
       }
     >
+      <p className="nav-group-label">Daily work</p>
       <Link href={base} aria-current={pathname === base ? "page" : undefined}>
         <span aria-hidden="true">◫</span>Overview
       </Link>
@@ -39,6 +41,8 @@ export function WorkspaceNav({
         href={`${base}/inventory`}
         aria-current={
           pathname.startsWith(`${base}/inventory`) ||
+          pathname.startsWith(`${base}/items/`) ||
+          pathname.startsWith(`${base}/recipes/`) ||
           pathname.startsWith(`${base}/sales/`)
             ? "page"
             : undefined
@@ -82,6 +86,7 @@ export function WorkspaceNav({
           <span aria-hidden="true">▥</span>Reports
         </Link>
       )}
+      <p className="nav-group-label">Business records</p>
       <Link
         href={`${base}/masters`}
         aria-current={pathname.endsWith("/masters") ? "page" : undefined}
@@ -96,6 +101,7 @@ export function WorkspaceNav({
           <span aria-hidden="true">♧</span>Team and access
         </Link>
       )}
+      {access?.canAudit && <Link href={`${base}/audit`} aria-current={pathname.endsWith("/audit") ? "page" : undefined}><span aria-hidden="true">◷</span>Audit history</Link>}
       <Link
         href={`${base}/settings`}
         aria-current={pathname.endsWith("/settings") ? "page" : undefined}

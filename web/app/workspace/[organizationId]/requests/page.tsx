@@ -1,3 +1,4 @@
+import { ResponsiveTable } from "@/components/responsive-table";
 import { operationNotice } from "@/lib/operation-notice";
 import { TransferDelivery } from "@/components/transfer-delivery";
 import { formatInventoryNumber } from "@/lib/inventory-format";
@@ -10,6 +11,11 @@ import {
   reasonField,
 } from "@/components/business-form";
 import { LiveInventoryRefresh } from "@/components/live-inventory-refresh";
+import { readAll } from "@/lib/read-all";
+import { ListControls } from "@/components/list-controls";
+import { listState, likeSearch, recordHref, type ListQuery } from "@/lib/list-query";
+import { isUuid } from "@/lib/auth/validation";
+import { notFound } from "next/navigation";
 export const instant = false;
 export const metadata = { title: "Stock requests" };
 export default async function RequestsPage({
@@ -17,52 +23,53 @@ export default async function RequestsPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams: Promise<{ completed?: string }>;
+  searchParams: Promise<ListQuery & { completed?: string }>;
 }) {
   const { organizationId } = await params;
-  const { completed } = await searchParams;
+  const query = await searchParams;
+  const { completed, record } = query;
+  const list = listState(query);
+  if (record && !isUuid(record)) notFound();
   const access = await workspaceRole(organizationId);
   const db = await createSupabaseServerClient();
   const base = `/workspace/${organizationId}`;
-  const [requests, lines, items, locations, deliveries] = await Promise.all([
-    db
-      .from("stock_requisitions")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false })
-      .limit(50),
-    db
-      .from("requisition_fulfilment_view")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .limit(1000),
-    db
+  let requestQuery = db.from("stock_requisitions").select("*", { count: "exact" }).eq("organization_id", organizationId).order("created_at", { ascending: false }).order("id", { ascending: false });
+  if (record) requestQuery = requestQuery.eq("id", record);
+  else {
+    if (list.status) requestQuery = requestQuery.eq("status", list.status);
+    if (list.q) requestQuery = /^(?:REQ-)?\d+$/i.test(list.q) ? requestQuery.eq("number", Number(list.q.replace(/^REQ-/i, ""))) : requestQuery.ilike("reason", likeSearch(list.q));
+  }
+  const [requests, items, locations, deliveries] = await Promise.all([
+    requestQuery.range(record ? 0 : list.from, record ? 0 : list.to),
+    readAll(db
       .from("items")
-      .select("id,sku,name,base_uom_code,stock_unit_label")
+      .select("id,sku,name,base_uom_code,stock_unit_label", { count: "exact" })
       .eq("organization_id", organizationId)
       .eq("is_active", true)
       .order("name")
-      .limit(500),
+      .order("id")),
     db
       .from("locations")
       .select("id,name")
       .eq("organization_id", organizationId)
       .eq("is_active", true),
-    db
+    readAll(db
       .from("transfer_delivery_view")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
-      .limit(1000),
+      .order("document_id").order("item_id")),
   ]);
   if (
     requests.error ||
-    lines.error ||
     items.error ||
     locations.error ||
     deliveries.error
   )
     throw new Error("Could not load stock requests.");
+  if (record && !requests.data.length) notFound();
+  const lines = record && requests.data.length ? await readAll(db.from("requisition_fulfilment_view").select("*", { count: "exact" }).eq("organization_id", organizationId).eq("requisition_id", record).order("id")) : { data: [], error: null };
+  if (lines.error || (record && requests.data.some(r => !lines.data.some(l => l.requisition_id === r.id)))) throw new Error("Complete request details could not be loaded.");
   const canRequest =
     access.canStock ||
     ["kitchen_lead", "bar_lead"].includes(access.primaryRole);
@@ -95,7 +102,7 @@ export default async function RequestsPage({
         </p>
       )}
       <div className="inventory-sections">
-        {canRequest && (
+        {canRequest && !record && (
           <section className="panel inventory-form-panel">
             <h2>Request stock</h2>
             {destinations.length ? (
@@ -136,12 +143,14 @@ export default async function RequestsPage({
           </section>
         )}
         <section className="panel">
-          <h2>Latest 50 requests</h2>
+          <h2>{record ? "Request details" : "Stock requests"}</h2>
+          {record ? <Link className="text-link" href={recordHref(`${base}/requests`,query)}>Back to stock requests</Link> : <ListControls query={query} total={requests.count ?? 0} statuses={["draft", "submitted", "approved", "rejected", "closed"]} label="stock requests" />}
           <LiveInventoryRefresh />
           {!requests.data.length && (
             <p className="inventory-empty">No stock requests yet.</p>
           )}
-          {requests.data.map((r) => {
+          {!record && <ResponsiveTable label="Stock requests" localControls={false}><table className="inventory-table"><thead><tr><th>Reference</th><th>Requesting location</th><th>Created</th><th>Status</th><th>Action</th></tr></thead><tbody>{requests.data.map(r=><tr key={r.id}><td>REQ-{r.number}<small>{r.reason}</small></td><td>{locations.data.find(l=>l.id===r.destination_location_id)?.name??"Inactive location"}</td><td>{new Date(r.created_at).toLocaleDateString("en-GB",{timeZone:"Africa/Lagos"})}</td><td>{r.status}</td><td><Link className="text-link" href={recordHref(`${base}/requests`,query,r.id)}>Open REQ-{r.number}</Link></td></tr>)}</tbody></table></ResponsiveTable>}
+          {(record ? requests.data : []).map((r) => {
             const requested = lines.data.filter(
               (l) => l.requisition_id === r.id,
             );
@@ -166,7 +175,8 @@ export default async function RequestsPage({
                   <span className="role-pill">{r.status}</span>
                 </div>
                 <p>{r.reason}</p>
-                <div className="inventory-table-wrap">
+                {!record && <Link className="text-link" href={`${base}/requests?record=${r.id}`}>Open REQ-{r.number}</Link>}
+                <ResponsiveTable label="Request lines">
                   <table className="inventory-table">
                     <thead>
                       <tr>
@@ -201,7 +211,7 @@ export default async function RequestsPage({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ResponsiveTable>
                 {r.status === "draft" && r.created_by === access.userId && (
                   <BusinessForm
                     organizationId={organizationId}
@@ -325,7 +335,7 @@ export default async function RequestsPage({
                 >
                   <div className="panel-heading">
                     <h3>
-                      {d.source_name} ? {d.destination_name}
+                  {d.source_name} → {d.destination_name}
                     </h3>
                     <span className="role-pill">{d.status}</span>
                   </div>

@@ -1,0 +1,513 @@
+[
+  {
+    "name": "owner-overview",
+    "width": 1440,
+    "heading": "Welcome to Reporting Test Restaurant.",
+    "headings": [
+      "Owner",
+      "Review business reports",
+      "Review purchasing",
+      "Manage team access",
+      "Maintain master data",
+      "Good decisions startwith a clear foundation.",
+      "Your setup checklist",
+      "Business at a glance"
+    ],
+    "overflow": false,
+    "tables": [],
+    "smallText": [
+      {
+        "text": "YOUR OPERATING FOUNDATION",
+        "size": "9px"
+      },
+      {
+        "text": "YOUR DAILY WORKSPACE",
+        "size": "8px"
+      },
+      {
+        "text": "Your business is saved. Build on it with consistent locations and item definitions.",
+        "size": "11px"
+      },
+      {
+        "text": "GETTING ESTABLISHED",
+        "size": "8px"
+      },
+      {
+        "text": "Your name, currency, and time zone are saved.",
+        "size": "9px"
+      },
+      {
+        "text": "3 active locations in this business.",
+        "size": "9px"
+      },
+      {
+        "text": "1 active inventory items defined.",
+        "size": "9px"
+      },
+      {
+        "text": "Your progress is saved to your business and available when you return.",
+        "size": "9px"
+      },
+      {
+        "text": "A consistent item catalogue and clear locations keep your team working from the same information.",
+        "size": "9px"
+      }
+    ],
+    "navLinks": []
+  },
+  {
+    "name": "stock",
+    "width": 1440,
+    "heading": "Inventory",
+    "headings": [
+      "Stock by location"
+    ],
+    "overflow": false,
+    "tables": [
+      {
+        "headers": [
+          "Item",
+          "Location",
+          "Quantity",
+          "Reserved for delivery",
+          "Available to issue",
+          "Average cost (NGN)",
+          "Last purchase price (NGN/base unit)",
+          "Current value (NGN)"
+        ],
+        "rows": 1,
+        "alignment": "left",
+        "scrollWidth": 1058,
+        "clientWidth": 1058,
+        "keyboardFocusable": -1,
+        "name": null
+      }
+    ],
+    "smallText": [
+      {
+        "text": "CONTROL WHAT MOVES. KNOW WHAT REMAINS.",
+        "size": "9px"
+      },
+      {
+        "text": "Updates automatically every 15 seconds while this page is open.",
+        "size": "11px"
+      }
+    ],
+    "navLinks": [
+      {
+        "text": "Items",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=items"
+      },
+      {
+        "text": "Stock on hand",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=stock"
+      },
+      {
+        "text": "Movements",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=movements"
+      },
+      {
+        "text": "Recipes",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=recipes"
+      },
+      {
+        "text": "Documents & approvals",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=documents"
+      },
+      {
+        "text": "Sales batches",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=batches"
+      },
+      {
+        "text": "Sales import",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=sales"
+      },
+      {
+        "text": "Operating controls",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=controls"
+      }
+    ]
+  },
+  {
+    "name": "stock",
+    "width": 375,
+    "heading": "Inventory",
+    "headings": [
+      "Stock by location"
+    ],
+    "overflow": false,
+    "tables": [
+      {
+        "headers": [
+          "Item",
+          "Location",
+          "Quantity",
+          "Reserved for delivery",
+          "Available to issue",
+          "Average cost (NGN)",
+          "Last purchase price (NGN/base unit)",
+          "Current value (NGN)"
+        ],
+        "rows": 1,
+        "alignment": "left",
+        "scrollWidth": 601,
+        "clientWidth": 287,
+        "keyboardFocusable": -1,
+        "name": null
+      }
+    ],
+    "smallText": [
+      {
+        "text": "CONTROL WHAT MOVES. KNOW WHAT REMAINS.",
+        "size": "8px"
+      },
+      {
+        "text": "Shared items, approved movements, and stock across your operating areas.",
+        "size": "11px"
+      },
+      {
+        "text": "Updates automatically every 15 seconds while this page is open.",
+        "size": "11px"
+      }
+    ],
+    "navLinks": [
+      {
+        "text": "Items",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=items"
+      },
+      {
+        "text": "Stock on hand",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=stock"
+      },
+      {
+        "text": "Movements",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=movements"
+      },
+      {
+        "text": "Recipes",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=recipes"
+      },
+      {
+        "text": "Documents & approvals",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=documents"
+      },
+      {
+        "text": "Sales batches",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=batches"
+      },
+      {
+        "text": "Sales import",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=sales"
+      },
+      {
+        "text": "Operating controls",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=controls"
+      }
+    ]
+  },
+  {
+    "name": "report-custom",
+    "width": 1440,
+    "heading": "Reports",
+    "headings": [
+      "2026-10-26 to 2026-10-27",
+      "Net sales",
+      "Finance-reconciled COGS",
+      "Gross profit",
+      "Food cost",
+      "Recipe benchmarks",
+      "Purchasing and losses"
+    ],
+    "overflow": false,
+    "tables": [
+      {
+        "headers": [
+          "Measure",
+          "Selected period",
+          "Previous period"
+        ],
+        "rows": 4,
+        "alignment": "left",
+        "scrollWidth": 1071,
+        "clientWidth": 1071,
+        "keyboardFocusable": -1,
+        "name": null
+      }
+    ],
+    "smallText": [
+      {
+        "text": "EVIDENCE BEHIND EVERY FIGURE",
+        "size": "9px"
+      },
+      {
+        "text": "0 posted sales lines",
+        "size": "11.52px"
+      },
+      {
+        "text": "Awaiting approved Finance evidence",
+        "size": "11.52px"
+      },
+      {
+        "text": "Gross margin Unavailable",
+        "size": "11.52px"
+      },
+      {
+        "text": "Food cost / net food sales Unavailable",
+        "size": "11.52px"
+      }
+    ],
+    "navLinks": [
+      {
+        "text": "Overview",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/reports?start=2026-10-26&end=2026-10-27&section=overview"
+      },
+      {
+        "text": "Inventory details",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/reports?start=2026-10-26&end=2026-10-27&section=inventory"
+      },
+      {
+        "text": "Finance review",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/reports?start=2026-10-26&end=2026-10-27&section=finance"
+      },
+      {
+        "text": "Actions",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/reports?start=2026-10-26&end=2026-10-27&section=actions"
+      },
+      {
+        "text": "Saved reports",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/reports?start=2026-10-26&end=2026-10-27&section=published"
+      }
+    ]
+  },
+  {
+    "name": "weekly-after-custom",
+    "url": "http://127.0.0.1:3100/workspace/66666666-6666-4666-8666-666666666666/reports?section=overview&cadence=weekly&start=2026-10-26&end=2026-10-27&location=",
+    "context": "2026-10-26 to 2026-10-27\n\nWhole business, including stock in transit · Africa/Lagos\n\n0 posted sales lines\n0 stock records pending\n0 late entries\nReport basis and coverage"
+  },
+  {
+    "name": "invalid-report-period",
+    "width": 1440,
+    "heading": "We couldn’t load this page.",
+    "headings": [],
+    "overflow": false,
+    "tables": [],
+    "smallText": [
+      {
+        "text": "LET’S GET BACK ON TRACK",
+        "size": "10px"
+      }
+    ],
+    "navLinks": []
+  },
+  {
+    "name": "kitchen-reports",
+    "width": 1440,
+    "heading": "Reports",
+    "headings": [
+      "2026-10-31 to 2026-10-31",
+      "Operational overview"
+    ],
+    "overflow": false,
+    "tables": [],
+    "smallText": [
+      {
+        "text": "EVIDENCE BEHIND EVERY FIGURE",
+        "size": "9px"
+      }
+    ],
+    "navLinks": [
+      {
+        "text": "Overview",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/reports?section=overview"
+      },
+      {
+        "text": "Inventory details",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/reports?section=inventory"
+      },
+      {
+        "text": "Actions",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/reports?section=actions"
+      }
+    ]
+  },
+  {
+    "name": "kitchen-controls",
+    "width": 375,
+    "heading": "Inventory",
+    "headings": [
+      "Three operating areas",
+      "Manager appointments",
+      "Inventory periods"
+    ],
+    "overflow": false,
+    "tables": [],
+    "smallText": [
+      {
+        "text": "CONTROL WHAT MOVES. KNOW WHAT REMAINS.",
+        "size": "8px"
+      },
+      {
+        "text": "Shared items, approved movements, and stock across your operating areas.",
+        "size": "11px"
+      },
+      {
+        "text": "The business owner appoints operational managers from active verified members.",
+        "size": "11px"
+      }
+    ],
+    "navLinks": [
+      {
+        "text": "Items",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=items"
+      },
+      {
+        "text": "Stock on hand",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=stock"
+      },
+      {
+        "text": "Movements",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=movements"
+      },
+      {
+        "text": "Recipes",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=recipes"
+      },
+      {
+        "text": "Documents & approvals",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=documents"
+      },
+      {
+        "text": "Sales batches",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=batches"
+      },
+      {
+        "text": "Sales import",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=sales"
+      },
+      {
+        "text": "Operating controls",
+        "href": "/workspace/66666666-6666-4666-8666-666666666666/inventory?view=controls"
+      }
+    ]
+  },
+  {
+    "name": "purchasing-empty",
+    "width": 1440,
+    "heading": "Purchasing",
+    "headings": [
+      "New purchase order",
+      "Latest 50 purchase orders"
+    ],
+    "overflow": false,
+    "tables": [],
+    "smallText": [
+      {
+        "text": "FROM APPROVED ORDER TO VERIFIED DELIVERY",
+        "size": "9px"
+      },
+      {
+        "text": "You are creating this order with your assigned Procurement duty. An independent Operations Manager r",
+        "size": "11px"
+      },
+      {
+        "text": "Updates automatically every 15 seconds while this page is open.",
+        "size": "11px"
+      }
+    ],
+    "navLinks": []
+  },
+  {
+    "name": "requests-empty",
+    "width": 375,
+    "heading": "Stock requests",
+    "headings": [
+      "Latest 50 requests",
+      "Deliveries and acceptance"
+    ],
+    "overflow": false,
+    "tables": [],
+    "smallText": [
+      {
+        "text": "ASK. APPROVE. DISPATCH. ACKNOWLEDGE.",
+        "size": "8px"
+      },
+      {
+        "text": "Request stock from Main Store and track every outstanding quantity.",
+        "size": "11px"
+      },
+      {
+        "text": "Updates automatically every 15 seconds while this page is open.",
+        "size": "11px"
+      }
+    ],
+    "navLinks": []
+  },
+  {
+    "name": "supplier-items-empty",
+    "width": 1440,
+    "heading": "Master data",
+    "headings": [
+      "Supplier-item master",
+      "Link a supplier item"
+    ],
+    "overflow": false,
+    "tables": [
+      {
+        "headers": [
+          "Vendor / item",
+          "Purchase pack",
+          "Base quantity",
+          "Quote (NGN/pack)",
+          "Status",
+          "Action"
+        ],
+        "rows": 0,
+        "alignment": null,
+        "scrollWidth": 1058,
+        "clientWidth": 1058,
+        "keyboardFocusable": -1,
+        "name": null
+      }
+    ],
+    "smallText": [
+      {
+        "text": "CONSISTENT DEFINITIONS. DEPENDABLE OPERATIONS.",
+        "size": "9px"
+      },
+      {
+        "text": "Example: purchase unit ‘bag’, base quantity ‘50’ means one bag contains 50 of this item's displayed ",
+        "size": "11px"
+      }
+    ],
+    "navLinks": [
+      {
+        "text": "Overview",
+        "href": "/workspace/55555555-5555-4555-8555-555555555555/masters"
+      },
+      {
+        "text": "Vendors",
+        "href": "/workspace/55555555-5555-4555-8555-555555555555/masters?view=vendors"
+      },
+      {
+        "text": "Supplier items",
+        "href": "/workspace/55555555-5555-4555-8555-555555555555/masters?view=vendor_items"
+      },
+      {
+        "text": "Final recipes",
+        "href": "/workspace/55555555-5555-4555-8555-555555555555/inventory?view=final_recipes"
+      },
+      {
+        "text": "Sub-recipes",
+        "href": "/workspace/55555555-5555-4555-8555-555555555555/inventory?view=sub_recipes"
+      },
+      {
+        "text": "Menu mapping",
+        "href": "/workspace/55555555-5555-4555-8555-555555555555/masters?view=menu"
+      },
+      {
+        "text": "Units",
+        "href": "/workspace/55555555-5555-4555-8555-555555555555/masters?view=units"
+      }
+    ]
+  }
+]

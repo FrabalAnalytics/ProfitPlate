@@ -335,6 +335,7 @@ test("department count adjusts stock only after independent Operations approval"
     const ops = await context.newPage();
     await login(ops, "ops");
     await ops.goto(`${base}/counts`);
+    await ops.getByRole("link", {name:"Open count",exact:true}).click();
     await ops
       .getByRole("button", { name: "Approve count adjustment", exact: true })
       .click();

@@ -1,3 +1,4 @@
+import { ResponsiveTable } from "@/components/responsive-table";
 import type { Database } from "@/lib/database.types";
 import { formatInventoryNumber } from "@/lib/inventory-format";
 import { BusinessForm, hiddenField, reasonField } from "./business-form";
@@ -36,7 +37,7 @@ export function TransferDelivery({
           ? "Dispatched quantities stay reserved in Store. Only accepted quantities move to the receiving location. Rejected goods stay reserved until Store confirms their return."
           : "This earlier dispatch already moved stock into transit. Accepting it adds stock to the destination; confirming rejected returns restores stock to Store."}
       </p>
-      <div className="inventory-table-wrap">
+      <ResponsiveTable label="Delivery quantities">
         <table className="inventory-table">
           <thead>
             <tr>
@@ -65,7 +66,7 @@ export function TransferDelivery({
             ))}
           </tbody>
         </table>
-      </div>
+      </ResponsiveTable>
       {delivery.status === "dispatched" &&
         canReceive &&
         delivery.created_by !== userId &&

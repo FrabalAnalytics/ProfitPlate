@@ -1,3 +1,4 @@
+import { readAll } from "@/lib/read-all";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireMembership } from "@/lib/auth/session";
@@ -23,12 +24,12 @@ export default async function TeamPage({
   const db = await createSupabaseServerClient();
   const [directory, invitations, duties] = await Promise.all([
     db.rpc("team_directory", { p_organization_id: organizationId }),
-    db
+    readAll(db
       .from("organization_invitations")
-      .select("id,recipient_email,proposed_role,status,expires_at")
+      .select("id,recipient_email,proposed_role,status,expires_at", {count:"exact"})
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
-      .limit(100),
+      .order("id")),
     db
       .from("additional_role_assignments")
       .select("user_id,role")
@@ -42,7 +43,7 @@ export default async function TeamPage({
         <div>
           <p className="eyebrow">THE RIGHT ACCESS FOR EACH PERSON</p>
           <h1>Team and access</h1>
-          <p>Invite test users, assign working roles and manage access.</p>
+          <p>Invite team members, assign working roles and manage access.</p>
         </div>
       </div>
       <div className="inventory-sections">
@@ -115,7 +116,7 @@ export default async function TeamPage({
           <h2>Invite a team member</h2>
           <p className="inventory-intro">
             No email is sent. Generate a manual access code and share it with
-            the intended test user. They sign in with the invited email, then
+            the intended team member. They sign in with the invited email, then
             enter the code at{" "}
             <Link className="text-link" href="/join">
               Join business

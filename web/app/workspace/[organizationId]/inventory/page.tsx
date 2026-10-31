@@ -1,3 +1,7 @@
+import { readAll } from "@/lib/read-all";
+import { ListControls } from "@/components/list-controls";
+import { listState, likeSearch, orSearch, type ListQuery } from "@/lib/list-query";
+import { ResponsiveTable } from "@/components/responsive-table";
 import { SalesBatchList } from "@/components/sales-batch-list";
 import { redirect } from "next/navigation";
 import { operationNotice } from "@/lib/operation-notice";
@@ -23,7 +27,7 @@ export default async function InventoryPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams: Promise<{
+  searchParams: Promise<ListQuery & {
     view?: string;
     action?: string;
     saved?: string;
@@ -34,34 +38,22 @@ export default async function InventoryPage({
   const { membership } = await requireMembership(organizationId);
   const user = await requireUser();
   const access = await workspaceRole(organizationId);
-  const { view = "items", action, saved, document } = await searchParams;
+  const query = await searchParams;
+  const { view = "items", action, saved, document } = query;
+  const list = listState(query);
   const db = await createSupabaseServerClient();
   const base = `/workspace/${organizationId}/inventory`;
-  const [itemResult, locationResult, purchaseResult] = await Promise.all([
-    db
-      .from("items")
-      .select("id,sku,name,category,base_uom_code,is_active,stock_unit_label")
-      .eq("organization_id", organizationId)
-      .order("name")
-      .limit(500),
-    db
-      .from("locations")
-      .select("id,name,is_active")
-      .eq("organization_id", organizationId)
-      .eq("is_active", true)
-      .order("name"),
-    db
-      .from("inventory_item_view")
-      .select(
-        "id,last_purchase_unit_cost,last_purchase_date,last_purchase_source,imported_price_status",
-      )
-      .eq("organization_id", organizationId)
-      .order("name")
-      .limit(500),
+  const needsItems = !["stock", "movements", "sales", "controls"].includes(view);
+  let itemQuery = db.from("items").select("id,sku,name,category,base_uom_code,is_active,stock_unit_label", { count: "exact" }).eq("organization_id", organizationId).order("name").order("id");
+  if (view === "items" && list.q) itemQuery = itemQuery.or(orSearch(["name","sku"],list.q));
+  const [itemResult, locationResult] = await Promise.all([
+    needsItems ? view === "items" ? itemQuery.range(list.from, list.to) : readAll(itemQuery) : {data: [], error: null, count: 0},
+    ["stock", "movements", "sales"].includes(view) ? {data: [], error: null} : readAll(db.from("locations").select("id,name,is_active", {count:"exact"}).eq("organization_id", organizationId).eq("is_active", true).order("name").order("id")),
   ]);
-  if (itemResult.error || locationResult.error || purchaseResult.error)
-    throw new Error("We could not load inventory. Please try again.");
-  const items = itemResult.data;
+  if (itemResult.error || locationResult.error) throw new Error("We could not load inventory. Please try again.");
+  const purchaseResult = view === "items" && (itemResult.data?.length ?? 0)>0 ? await readAll(db.from("inventory_item_view").select("id,last_purchase_unit_cost,last_purchase_date,last_purchase_source,imported_price_status", {count:"exact"}).eq("organization_id", organizationId).in("id", (itemResult.data ?? []).map(i => i.id)).order("id")) : {data: [], error: null};
+  if (purchaseResult.error) throw new Error("Could not load purchase prices.");
+  const items = itemResult.data ?? [];
   const purchases = new Map(purchaseResult.data.map((item) => [item.id, item]));
   const locations = locationResult.data;
   const isManager = access.isManager;
@@ -155,12 +147,12 @@ export default async function InventoryPage({
         .from("operating_areas")
         .select("area,location_id")
         .eq("organization_id", organizationId),
-      db
+      readAll(db
         .from("inventory_periods")
-        .select("id,starts_on,ends_on,is_closed")
+        .select("id,starts_on,ends_on,is_closed", {count:"exact"})
         .eq("organization_id", organizationId)
         .order("starts_on", { ascending: false })
-        .limit(50),
+        .order("id")),
       isAdmin
         ? db.rpc("inventory_team_options", {
             p_organization_id: organizationId,
@@ -210,8 +202,8 @@ export default async function InventoryPage({
           <h2>Manager appointments</h2>
           <p className="inventory-intro">
             Operations Managers approve any value. Nobody can approve their own
-            submission. Appoint at least two different people before operational
-            testing.
+            submission. Appoint at least two different people before daily
+            operations.
           </p>
           {team.data?.map((m) => (
             <p key={m.user_id}>
@@ -301,24 +293,25 @@ export default async function InventoryPage({
     );
   } else if (view === "stock" || view === "movements") {
     if (view === "stock") {
-      const { data, error } = await db
+      let balanceQuery = db
         .from("inventory_balance_view")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("organization_id", organizationId)
         .order("location_name")
-        .order("item_name")
-        .limit(500);
+        .order("item_name").order("location_id").order("item_id");
+      if (list.q) balanceQuery = balanceQuery.ilike("item_name", likeSearch(list.q));
+      const { data, error, count } = await balanceQuery.range(list.from, list.to);
       if (error) throw new Error("We could not load stock balances.");
       content = (
         <section className="panel">
           <h2>Stock by location</h2>
+          <ListControls query={query} total={count ?? 0} label="stock balances" />
           <LiveInventoryRefresh />
           <p className="inventory-intro">
-            Current value uses business-wide average cost. Showing up to 500
-            item/location balances.
+            Current value uses business-wide average cost. Availability excludes stock reserved for delivery.
           </p>
           {data.length ? (
-            <div className="inventory-table-wrap">
+            <ResponsiveTable label="Inventory records" localControls={false}>
               <table className="inventory-table">
                 <thead>
                   <tr>
@@ -348,7 +341,7 @@ export default async function InventoryPage({
                           ? "Missing"
                           : formatAmount(b.average_cost)}
                       </td>
-                      <td>
+                      <td data-sort={b.last_purchase_unit_cost ?? ""}>
                         <PurchasePrice
                           price={b.last_purchase_unit_cost}
                           source={b.last_purchase_source}
@@ -365,7 +358,7 @@ export default async function InventoryPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTable>
           ) : (
             <p className="inventory-empty">
               No stock has been posted. Start with independently approved
@@ -375,24 +368,27 @@ export default async function InventoryPage({
         </section>
       );
     } else {
-      const { data, error } = await db
+      let movementQuery = db
         .from("inventory_movement_view")
-        .select("*")
+        .select("*", {count:"exact"})
         .eq("organization_id", organizationId)
         .order("posted_at", { ascending: false })
         .order("id", { ascending: false })
-        .limit(100);
+        ;
+      if (list.q) movementQuery = movementQuery.ilike("item_name", likeSearch(list.q));
+      const {data, error, count} = await movementQuery.range(list.from, list.to);
       if (error) throw new Error("We could not load inventory movements.");
       content = (
         <section className="panel">
-          <h2>Latest 100 inventory movements</h2>
+          <h2>Movement ledger</h2>
+          <ListControls query={query} total={count ?? 0} label="movements" />
           <LiveInventoryRefresh />
           <p className="inventory-intro">
             Permanent posting history. Event dates and posting times are shown
             separately.
           </p>
           {data.length ? (
-            <div className="inventory-table-wrap">
+            <ResponsiveTable label="Inventory records" localControls={false}>
               <table className="inventory-table">
                 <thead>
                   <tr>
@@ -428,7 +424,7 @@ export default async function InventoryPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTable>
           ) : (
             <p className="inventory-empty">
               No movements yet. Drafts and pending approvals do not change
@@ -447,23 +443,14 @@ export default async function InventoryPage({
           : undefined;
     let recipeQuery = db
       .from("recipes")
-      .select("id,code,name,kind,output_item_id")
+      .select("id,code,name,kind,output_item_id", {count:"exact"})
       .eq("organization_id", organizationId)
       .order("name")
-      .limit(100);
+      .order("id");
+    if (list.q) recipeQuery = recipeQuery.ilike("name", likeSearch(list.q));
     if (recipeKind) recipeQuery = recipeQuery.eq("kind", recipeKind);
-    const { data: recipes, error } = await recipeQuery;
+    const { data: recipes, error, count } = await recipeQuery.range(list.from, list.to);
     if (error) throw new Error("We could not load recipes.");
-    const costs = await Promise.all(
-      recipes.map((r) =>
-        db.rpc("current_recipe_cost", {
-          p_organization_id: organizationId,
-          p_recipe_id: r.id,
-        }),
-      ),
-    );
-    if (costs.some((c) => c.error))
-      throw new Error("We could not calculate recipe costs.");
     content = (
       <div className="inventory-sections">
         <section className="panel">
@@ -474,24 +461,24 @@ export default async function InventoryPage({
                 ? "Sub-recipe master"
                 : "Recipes and live costs"}
           </h2>
+          <ListControls query={query} total={count ?? 0} label="recipes" />
           <p className="inventory-intro">
             Final recipes consume their listed ingredients. Stocked sub-recipes
             consume the semi-finished SKU at sale time, without consuming its
             raw ingredients again.
           </p>
           {recipes.length ? (
-            <div className="inventory-table-wrap">
+            <ResponsiveTable label="Inventory records" localControls={false}>
               <table className="inventory-table">
                 <thead>
                   <tr>
                     <th>Recipe / menu code</th>
                     <th>Type</th>
-                    <th>Current unit cost (NGN)</th>
+                    <th>Recipe details</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {recipes.map((r, i) => {
-                    const cost = costs[i].data;
+                  {recipes.map((r) => {
                     return (
                       <tr key={r.id}>
                         <td>
@@ -500,19 +487,14 @@ export default async function InventoryPage({
                         </td>
                         <td>{r.kind.replaceAll("_", " ")}</td>
                         <td>
-                          {cost &&
-                          typeof cost === "object" &&
-                          !Array.isArray(cost) &&
-                          cost.complete
-                            ? formatAmount(String(cost.unit_cost))
-                            : "Incomplete — ingredient costs missing"}
+                          <Link className="text-link" href={`/workspace/${organizationId}/recipes/${r.id}`}>View ingredients and cost</Link>
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTable>
           ) : (
             <p className="inventory-empty">
               No recipes yet. Define ingredients and semi-finished SKUs first.
@@ -562,28 +544,7 @@ export default async function InventoryPage({
             )}
           </section>
         )}
-        {canEdit && recipes.length > 0 && (
-          <section className="panel inventory-form-panel">
-            <h2>Create a new recipe version</h2>
-            {form(
-              "revise_recipe",
-              [
-                field(
-                  "id",
-                  "Recipe",
-                  recipes.map((r) => ({ value: r.id, label: r.name })),
-                ),
-                field("standard_output", "Standard output quantity"),
-              ],
-              "Save new version",
-              {
-                lines: true,
-                recipe: true,
-                help: "Enter the full new ingredient list. Existing versions and drafts retain their original quantities.",
-              },
-            )}
-          </section>
-        )}
+        {canEdit && recipes.length > 0 && <p className="inventory-intro">Open a recipe to inspect its ingredients, history and current cost, or create a new version from its existing definition.</p>}
       </div>
     );
   } else if (view === "sales") {
@@ -604,25 +565,28 @@ export default async function InventoryPage({
   } else if (view === "documents" || view === "batches") {
     let documentQuery = db
       .from("inventory_documents")
-      .select("*")
+      .select("*", {count:"exact"})
       .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false })
-      .limit(50);
+      .order("created_at", { ascending: false }).order("id", {ascending:false});
+    if (list.q) documentQuery = documentQuery.ilike("reason", likeSearch(list.q));
+    if (list.status) documentQuery = documentQuery.eq("status", list.status);
     if (view === "batches") documentQuery = documentQuery.eq("kind", "sales");
     if (document) documentQuery = documentQuery.eq("id", document);
-    const [documents, versions, transit] = await Promise.all([
-      documentQuery,
-      db
+    const documents = await documentQuery.range(document ? 0 : list.from, document ? 0 : list.to);
+    if (documents.error) throw new Error("Could not load stock documents.");
+    const transferIds = documents.data.filter(d => d.kind === "transfer").map(d => d.id);
+    const [versions, transit] = await Promise.all([
+      action === "production" ? readAll(db
         .from("recipe_versions")
-        .select("id,recipe_id,revision,standard_output")
+        .select("id,recipe_id,revision,standard_output", {count:"exact"})
         .eq("organization_id", organizationId)
         .order("revision", { ascending: false })
-        .limit(500),
-      db
+        .order("id")) : {data: [], error: null},
+      transferIds.length ? readAll(db
         .from("transfer_delivery_view")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .limit(500),
+        .select("*", {count:"exact"})
+        .eq("organization_id", organizationId).in("document_id", transferIds)
+        .order("document_id").order("item_id")) : {data: [], error: null},
     ]);
     if (documents.error || versions.error || transit.error)
       throw new Error("We could not load stock documents.");
@@ -651,11 +615,11 @@ export default async function InventoryPage({
     );
     if (previews.some((p) => p.error))
       throw new Error("We could not load document details for review.");
-    const { data: subRecipes, error } = await db
+    const { data: subRecipes, error } = action === "production" ? await readAll(db
       .from("recipes")
-      .select("id,name,kind")
+      .select("id,name,kind", {count:"exact"})
       .eq("organization_id", organizationId)
-      .eq("kind", "sub_recipe");
+      .eq("kind", "sub_recipe").order("id")) : {data: [], error: null};
     if (error) throw new Error("We could not load production recipes.");
     const kinds = [
       "opening",
@@ -725,6 +689,7 @@ export default async function InventoryPage({
       );
     content = (
       <div className="inventory-sections">
+        {!document && <ListControls query={query} total={documents.count ?? 0} statuses={["draft", "submitted", "posted", "rejected", "dispatched"]} label={view === "batches" ? "sales batches" : "stock documents"} />}
         {isOperator && view === "documents" && (
           <div className="inventory-actions">
             {kinds.map((k) => (
@@ -801,7 +766,7 @@ export default async function InventoryPage({
                       ? ` · Reviewed by ${d.approved_by.slice(0, 8)}`
                       : ""}
                   </p>
-                  <div className="inventory-table-wrap">
+                  <ResponsiveTable label="Inventory records">
                     <table className="inventory-table">
                       <thead>
                         <tr>
@@ -843,7 +808,7 @@ export default async function InventoryPage({
                         })()}
                       </tbody>
                     </table>
-                  </div>
+                  </ResponsiveTable>
                   {d.status === "submitted" && d.kind !== "sales" && (
                     <p className="field-help">
                       {purchaseReceiptIds.has(d.id)
@@ -940,6 +905,7 @@ export default async function InventoryPage({
       <div className="inventory-sections">
         <section className="panel">
           <h2>Item catalogue</h2>
+          <ListControls query={query} total={itemResult.count ?? 0} label="items" />
           <p className="inventory-intro">
             Three categories, one shared catalogue. Showing up to 500 items.
             Units and categories stay fixed once created. Posted receipt prices
@@ -947,7 +913,7 @@ export default async function InventoryPage({
             references.
           </p>
           {items.length ? (
-            <div className="inventory-table-wrap">
+            <ResponsiveTable label="Inventory records" localControls={false}>
               <table className="inventory-table">
                 <thead>
                   <tr>
@@ -956,7 +922,7 @@ export default async function InventoryPage({
                     <th>Category</th>
                     <th>Base unit</th>
                     <th>Last purchase price (NGN/base unit)</th>
-                    <th>Status</th>
+                    <th>Status</th><th>Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -966,7 +932,7 @@ export default async function InventoryPage({
                       <td>{i.sku}</td>
                       <td>{i.category.replaceAll("_", " ")}</td>
                       <td>{i.stock_unit_label ?? i.base_uom_code}</td>
-                      <td>
+                      <td data-sort={purchases.get(i.id)?.last_purchase_unit_cost ?? ""}>
                         <PurchasePrice
                           price={purchases.get(i.id)?.last_purchase_unit_cost}
                           source={purchases.get(i.id)?.last_purchase_source}
@@ -975,11 +941,12 @@ export default async function InventoryPage({
                         />
                       </td>
                       <td>{i.is_active ? "Active" : "Inactive"}</td>
+                      <td><Link className="text-link" href={`/workspace/${organizationId}/items/${i.id}`}>View / edit item</Link></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTable>
           ) : (
             <p className="inventory-empty">
               Add your first raw material, semi-finished SKU, or general supply.
@@ -1037,11 +1004,11 @@ export default async function InventoryPage({
           ["batches", "Sales batches"],
           ["sales", "Sales import"],
           ["controls", "Operating controls"],
-        ].map(([key, label]) => (
+        ].filter(([key]) => (key !== "sales" || access.canStock) && (key !== "controls" || isAdmin || isManager)).map(([key, label]) => (
           <Link
             key={key}
             href={`${base}?view=${key}`}
-            aria-current={view === key ? "page" : undefined}
+            aria-current={(view === key || (key === "recipes" && ["final_recipes", "sub_recipes"].includes(view))) ? "page" : undefined}
           >
             {label}
           </Link>

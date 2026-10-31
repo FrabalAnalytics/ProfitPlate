@@ -10,7 +10,7 @@ export default defineConfig({
     headless: true,
     trace: "retain-on-failure",
   },
-  webServer: [
+  webServer: process.env.PROFITPLATE_EXTERNAL_TEST_SERVERS === "1" ? undefined : [
     {
       command: "node scripts/auth-test-server.mjs",
       url: "http://127.0.0.1:54329/health",

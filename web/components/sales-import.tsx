@@ -30,7 +30,7 @@ export function SalesImport({
       </p>
       <p className="field-help">
         Required columns: external_id, menu_code, quantity, location. Add
-        net_sales for reporting: the whole line�s net revenue after discounts,
+        net_sales for reporting: the total net revenue for each line after discounts,
         excluding tax, in NGN. Blank amounts remain unavailable; zero means an
         explicitly free item.
       </p>

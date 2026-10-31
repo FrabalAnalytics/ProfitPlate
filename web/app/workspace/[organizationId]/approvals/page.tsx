@@ -1,3 +1,4 @@
+import { ResponsiveTable } from "@/components/responsive-table";
 import { SalesBatchList } from "@/components/sales-batch-list";
 import { formatInventoryNumber, formatAmount } from "@/lib/inventory-format";
 import { notFound } from "next/navigation";
@@ -12,84 +13,81 @@ import {
 import { LiveInventoryRefresh } from "@/components/live-inventory-refresh";
 import type { OperationIntent } from "../inventory/actions";
 import { money } from "@/lib/reporting";
+import { readAll } from "@/lib/read-all";
+import { ListControls } from "@/components/list-controls";
+import { listState, likeSearch, type ListQuery } from "@/lib/list-query";
 export const instant = false;
 export const metadata = { title: "Approvals" };
 export default async function ApprovalsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
+  searchParams: Promise<ListQuery>;
 }) {
   const { organizationId } = await params;
   const access = await workspaceRole(organizationId);
   if (!access.isManager) notFound();
   const db = await createSupabaseServerClient();
-  const [counts, countLines, reconciliations] = await Promise.all([
+  const query = await searchParams;
+  const list = listState(query);
+  const [counts, reconciliations] = await Promise.all([
     db
       .from("stock_counts")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("organization_id", organizationId)
       .eq("status", "submitted")
-      .limit(100),
-    db
-      .from("stock_count_line_view")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .limit(25000),
+      .ilike("reason", likeSearch(list.q)).order("created_at").order("id").range(list.from, list.to),
     db
       .from("report_reconciliations")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("organization_id", organizationId)
       .eq("status", "submitted")
-      .limit(100),
+      .ilike("reason", likeSearch(list.q)).order("created_at").order("id").range(list.from, list.to),
   ]);
-  if (counts.error || countLines.error || reconciliations.error)
+  if (counts.error || reconciliations.error)
     throw new Error("Could not load count and reconciliation approvals.");
-  const [stock, orders, orderLines, requests, requestLines, people] =
+  const [stock, orders, requests, people] =
     await Promise.all([
       db
         .from("inventory_documents")
         .select(
-          "id,kind,reason,event_date,created_by,planned_output,actual_output",
+          "id,kind,reason,event_date,created_by,planned_output,actual_output", { count: "exact" },
         )
         .eq("organization_id", organizationId)
         .eq("status", "submitted")
         .order("created_at")
-        .limit(100),
+        .ilike("reason", likeSearch(list.q)).order("id").range(list.from, list.to),
       db
         .from("purchase_order_summary")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("organization_id", organizationId)
         .eq("status", "submitted")
         .order("created_at")
-        .limit(100),
-      db
-        .from("purchase_order_line_view")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .limit(1000),
+        .ilike("reason", likeSearch(list.q)).order("id").range(list.from, list.to),
       db
         .from("stock_requisitions")
-        .select("*")
+        .select("*", { count: "exact" })
         .eq("organization_id", organizationId)
         .eq("status", "submitted")
         .order("created_at")
-        .limit(100),
-      db
-        .from("stock_requisition_line_view")
-        .select("*")
-        .eq("organization_id", organizationId)
-        .limit(1000),
+        .ilike("reason", likeSearch(list.q)).order("id").range(list.from, list.to),
       db.rpc("operating_people", { p_organization_id: organizationId }),
     ]);
   if (
     stock.error ||
     orders.error ||
-    orderLines.error ||
     requests.error ||
-    requestLines.error ||
     people.error
   )
     throw new Error("Could not load approvals.");
+  const [countLines, orderLines, requestLines] = await Promise.all([
+    counts.data.length ? readAll(db.from("stock_count_line_view").select("*", { count: "exact" }).eq("organization_id", organizationId).in("count_id", counts.data.map(c => c.id)).order("count_id").order("item_id")) : {data: [], error: null},
+    orders.data.length ? readAll(db.from("purchase_order_line_view").select("*", { count: "exact" }).eq("organization_id", organizationId).in("order_id", orders.data.map(o => o.id)).order("id")) : {data: [], error: null},
+    requests.data.length ? readAll(db.from("stock_requisition_line_view").select("*", { count: "exact" }).eq("organization_id", organizationId).in("requisition_id", requests.data.map(r => r.id)).order("id")) : {data: [], error: null},
+  ]);
+  if (countLines.error || orderLines.error || requestLines.error || counts.data.some(c => !countLines.data.some(l => l.count_id === c.id)) || requests.data.some(r => !requestLines.data.some(l => l.requisition_id === r.id)) || orders.data.some(o => orderLines.data.filter(l => l.order_id === o.id).length !== o.line_count))
+    throw new Error("Complete approval evidence could not be loaded. Refresh before approving.");
   const linked = stock.data.length
     ? await db
         .from("purchase_receipts")
@@ -158,10 +156,11 @@ export default async function ApprovalsPage({
         <div>
           <p className="eyebrow">REVIEW THE EVIDENCE. KEEP SERVICE MOVING.</p>
           <h1>Approvals</h1>
-          <p>Both managers approve any value. Self-approval is blocked.</p>
+          <p>Operations Managers review submissions independently. Self-approval is blocked.</p>
         </div>
       </div>
       <LiveInventoryRefresh />
+      <ListControls query={query} total={Math.max(counts.count ?? 0, reconciliations.count ?? 0, stock.count ?? 0, orders.count ?? 0, requests.count ?? 0)} label="submissions per group" />
       <div className="inventory-actions">
         <Link
           className="button button-secondary"
@@ -203,7 +202,7 @@ export default async function ApprovalsPage({
                 Cutoff: {c.cutoff_at}. Stock movements after this instant block
                 the adjustment and require a new count.
               </p>
-              <div className="inventory-table-wrap">
+              <ResponsiveTable label="Approval evidence">
                 <table className="inventory-table">
                   <thead>
                     <tr>
@@ -232,7 +231,7 @@ export default async function ApprovalsPage({
                       ))}
                   </tbody>
                 </table>
-              </div>
+              </ResponsiveTable>
               {buttons(c.id, c.created_by, "approve_count", "reject_count")}
             </details>
           ))}
@@ -304,7 +303,7 @@ export default async function ApprovalsPage({
                     {d.event_date} · {person(d.created_by)}
                   </small>
                 </summary>
-                <div className="inventory-table-wrap">
+                <ResponsiveTable label="Approval evidence">
                   <table className="inventory-table">
                     <thead>
                       <tr>
@@ -336,7 +335,7 @@ export default async function ApprovalsPage({
                       )}
                     </tbody>
                   </table>
-                </div>
+                </ResponsiveTable>
                 {d.kind === "production" && (
                   <p>
                     Planned output: {formatInventoryNumber(d.planned_output)} ·
@@ -378,7 +377,7 @@ export default async function ApprovalsPage({
                 </small>
               </summary>
               <p>{p.reason}</p>
-              <div className="inventory-table-wrap">
+              <ResponsiveTable label="Approval evidence">
                 <table className="inventory-table">
                   <thead>
                     <tr>
@@ -404,7 +403,7 @@ export default async function ApprovalsPage({
                       ))}
                   </tbody>
                 </table>
-              </div>
+              </ResponsiveTable>
               {buttons(
                 p.id!,
                 p.created_by!,
@@ -427,7 +426,7 @@ export default async function ApprovalsPage({
                 </strong>
                 <small>{person(r.created_by)}</small>
               </summary>
-              <div className="inventory-table-wrap">
+              <ResponsiveTable label="Approval evidence">
                 <table className="inventory-table">
                   <thead>
                     <tr>
@@ -448,7 +447,7 @@ export default async function ApprovalsPage({
                       ))}
                   </tbody>
                 </table>
-              </div>
+              </ResponsiveTable>
               {buttons(
                 r.id,
                 r.created_by,

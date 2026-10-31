@@ -32,6 +32,7 @@ let limits = {
   clockSkewSeconds: 0,
 };
 let metrics = { user: 0, password: 0, logout: 0, account: 0, refresh: 0 };
+let incompleteEvidence = false;
 const org = "11111111-1111-4111-8111-111111111111";
 const otherOrg = "22222222-2222-4222-8222-222222222222";
 async function addUser(email, confirmed = true, suppliedPassword = password) {
@@ -475,6 +476,10 @@ const server = http.createServer(async (req, res) => {
     let raw = "";
     for await (const chunk of req) raw += chunk;
     const body = raw ? JSON.parse(raw) : {};
+    if (url.pathname === "/__test/incomplete-evidence") {
+      incompleteEvidence = body.enabled === true;
+      return send(res, 200, {enabled: incompleteEvidence});
+    }
     if (url.pathname === "/__test/auth-limits") {
       limits = {
         user: false,
@@ -688,9 +693,14 @@ const server = http.createServer(async (req, res) => {
         "team_directory",
         "operating_people",
         "issue_manual_invitation",
+        "search_audit_events",
       ].includes(rpcName)
     ) {
       const calls = {
+        search_audit_events: [
+          "select public.search_audit_events($1,$2,$3,$4,$5,$6,$7,$8,$9) result",
+          [body.p_organization_id,body.p_limit??50,body.p_cursor??null,body.p_actor_id??null,body.p_action??null,body.p_entity_type??null,body.p_entity_id??null,body.p_from??null,body.p_until??null],
+        ],
         action_command: [
           "select public.action_command($1,$2,$3,$4::jsonb) result",
           [
@@ -853,12 +863,20 @@ const server = http.createServer(async (req, res) => {
       ["GET", "HEAD"].includes(req.method)
     ) {
       const fields = (url.searchParams.get("select") || "*").split(",");
-      if (!fields.every((value) => value === "*" || /^[a-z_]+$/.test(value)))
+      if (!fields.every((value) => value === "*" || /^[a-z_]+(?:::text)?$/.test(value)))
         return send(res, 400, { code: "BAD_SELECT" });
       const params = [],
         where = [];
       for (const [key, value] of url.searchParams) {
         if (["select", "order", "limit", "offset"].includes(key)) continue;
+        if (key === "or") {
+          const clauses = value.slice(1,-1).split(',').map(clause => {
+            const match = /^([a-z_]+)\.ilike\.(.*)$/.exec(clause);
+            if (!match) throw new Error("Invalid search filter");
+            params.push(match[2]);return `"${match[1]}" ilike $${params.length}`;
+          });
+          where.push(`(${clauses.join(' or ')})`);continue;
+        }
         if (!/^[a-z_]+$/.test(key))
           return send(res, 400, { code: "BAD_FILTER" });
         if (value.startsWith("eq.")) {
@@ -871,6 +889,15 @@ const server = http.createServer(async (req, res) => {
             return `$${params.length}`;
           });
           where.push(`"${key}" in (${holders.join(",")})`);
+        } else if (value.startsWith("ilike.")) {
+          params.push(value.slice(6));
+          where.push(`"${key}" ilike $${params.length}`);
+        } else if (/^(gte|lte|gt|lt)\./.test(value)) {
+          const [operator, ...parts] = value.split('.');
+          params.push(parts.join('.'));
+          where.push(`"${key}" ${{gte:'>=',lte:'<=',gt:'>',lt:'<'}[operator]} $${params.length}`);
+        } else {
+          return send(res, 400, { code: "BAD_FILTER" });
         }
       }
       const ordering = (url.searchParams.get("order") || "")
@@ -883,18 +910,24 @@ const server = http.createServer(async (req, res) => {
         });
       const limit = url.searchParams.get("limit");
       if (limit && !/^\d{1,5}$/.test(limit)) throw new Error("Invalid limit");
-      const rows = await db.transaction(async (tx) => {
+      const offset = url.searchParams.get("offset") || "0";
+      if (!/^\d{1,9}$/.test(offset)) throw new Error("Invalid offset");
+      const result = await db.transaction(async (tx) => {
         await tx.query("select set_config('request.jwt.claims',$1,true)", [
           JSON.stringify(claims),
         ]);
         await tx.exec("set local role authenticated");
-        return (
+        const total = Number((await tx.query(`select count(*) as count from public."${table}"${where.length ? ` where ${where.join(" and ")}` : ""}`, params)).rows[0].count);
+        const rows = (
           await tx.query(
-            `select ${fields.map((f) => (f === "*" ? "*" : `"${f}"`)).join(",")} from public."${table}"${where.length ? ` where ${where.join(" and ")}` : ""}${ordering.length ? ` order by ${ordering.join(",")}` : ""}${limit ? ` limit ${Number(limit)}` : ""}`,
+            `select ${fields.map((f) => f.endsWith("::text") ? `"${f.slice(0,-6)}"::text as "${f.slice(0,-6)}"` : (f === "*" ? "*" : `"${f}"`)).join(",")} from public."${table}"${where.length ? ` where ${where.join(" and ")}` : ""}${ordering.length ? ` order by ${ordering.join(",")}` : ""} limit ${Math.min(Number(limit ?? 1000), 1000)} offset ${Number(offset)}`,
             params,
           )
         ).rows;
+        return {rows, total};
       });
+      const {total} = result;
+      const rows = incompleteEvidence && table === "purchase_order_line_view" ? [] : result.rows;
       return send(
         res,
         200,
@@ -904,7 +937,7 @@ const server = http.createServer(async (req, res) => {
             ? rows[0] || null
             : rows,
         {
-          "Content-Range": `${rows.length ? `0-${rows.length - 1}` : "*"}/${rows.length}`,
+          "Content-Range": `${rows.length ? `${Number(offset)}-${Number(offset) + rows.length - 1}` : "*"}/${total}`,
         },
       );
     }

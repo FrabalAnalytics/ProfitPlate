@@ -2,6 +2,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ProfitPlate's database foundation lives in `supabase/migrations`. Start with the [database workflow](supabase/README.md) and [schema/permissions contract](docs/Database_Foundation.md). Run `npm run db:test` for isolated checks or `npm run db:test:native` for PostgreSQL 17 concurrency checks.
 
+The [31 October system review fixes](docs/System_Review_Fixes_2026-10-31.md) add complete approval reads, paginated operational indexes, responsive tables, item/recipe details, audit history and report-date recovery. Run `npm run test:unit` for unit checks and `npm run test:ui` for the isolated browser suite; its runner starts and stops its own local test servers.
+
 ## Getting Started
 
 Authentication and the first UI slice are implemented. See [Authentication_and_UI.md](docs/Authentication_and_UI.md) for local review, session behavior, hosted Auth settings, browser tests, and remaining UI increments.

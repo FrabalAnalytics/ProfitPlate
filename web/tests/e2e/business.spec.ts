@@ -106,6 +106,7 @@ test("procurement, independent receiving and approved department requests work a
     ).toHaveCount(0);
     await login(store, "store");
     await store.goto(`${base}/purchasing`);
+    await store.getByRole("link", {name:"Open PO-1",exact:true}).click();
     await store.getByText("Record accepted delivery", { exact: true }).click();
     await select(store, "Receiving location").selectOption({
       label: "Main Store",
@@ -141,6 +142,7 @@ test("procurement, independent receiving and approved department requests work a
       gm.locator("summary").filter({ hasText: "Legacy pending bags" }),
     ).toHaveCount(0);
     await store.goto(`${base}/purchasing`);
+    await store.getByRole("link", {name:"Open PO-1",exact:true}).click();
     await store
       .getByRole("link", { name: "Review recorded delivery", exact: true })
       .click();
@@ -157,6 +159,7 @@ test("procurement, independent receiving and approved department requests work a
         exact: true,
       })
       .click();
+    await store.getByRole("link", {name:"Open PO-1",exact:true}).click();
     await expect(
       store.getByRole("article", {
         name: "PO-1 Workflow Supplier",
@@ -186,6 +189,7 @@ test("procurement, independent receiving and approved department requests work a
     await gm.getByRole("button", { name: "Approve", exact: true }).click();
     await expect(gm).toHaveURL(/requests/);
     await store.goto(`${base}/requests`);
+    await store.getByRole("link", {name:"Open REQ-1",exact:true}).click();
     await store.getByText("Dispatch approved stock", { exact: true }).click();
     const dispatch = store.getByRole("article", {
       name: "Request 1 Rice for service",
@@ -264,6 +268,7 @@ test("procurement, independent receiving and approved department requests work a
       "Rejection recorded",
     );
     await store.goto(`${base}/requests`);
+    await store.getByRole("link", {name:"Open REQ-1",exact:true}).click();
     const returned = store.getByRole("article", {
       name: "Delivery Service dispatch",
       exact: true,
@@ -286,6 +291,7 @@ test("procurement, independent receiving and approved department requests work a
       .click();
     await expect(store.getByRole("status")).toContainText("Return confirmed");
     await store.goto(`${base}/requests`);
+    await store.getByRole("link", {name:"Open REQ-1",exact:true}).click();
     await expect(returned).toContainText("received");
     await dispatch
       .getByText("Dispatch approved stock", { exact: true })

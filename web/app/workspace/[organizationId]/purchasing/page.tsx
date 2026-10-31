@@ -1,3 +1,4 @@
+import { ResponsiveTable } from "@/components/responsive-table";
 import { formatInventoryNumber, formatAmount } from "@/lib/inventory-format";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,6 +11,10 @@ import {
 } from "@/components/business-form";
 import { LiveInventoryRefresh } from "@/components/live-inventory-refresh";
 import type { OperationField } from "@/components/operation-form";
+import { readAll } from "@/lib/read-all";
+import { ListControls } from "@/components/list-controls";
+import { listState, orSearch, recordHref, type ListQuery } from "@/lib/list-query";
+import { isUuid } from "@/lib/auth/validation";
 export const instant = false;
 export const metadata = { title: "Purchasing" };
 export default async function PurchasingPage({
@@ -17,47 +22,46 @@ export default async function PurchasingPage({
   searchParams,
 }: {
   params: Promise<{ organizationId: string }>;
-  searchParams: Promise<{ vendor?: string; saved?: string; received?: string }>;
+  searchParams: Promise<ListQuery & { vendor?: string; saved?: string; received?: string }>;
 }) {
   const { organizationId } = await params;
   const access = await workspaceRole(organizationId);
   if (!access.canReadVendors) notFound();
-  const { vendor: selectedVendor, saved, received } = await searchParams;
+  const query = await searchParams;
+  const { vendor: selectedVendor, saved, received, record } = query;
+  const list = listState(query);
+  if (record && !isUuid(record)) notFound();
   const db = await createSupabaseServerClient();
   const base = `/workspace/${organizationId}`;
-  const pending = await db
+  const pending = await readAll(db
     .from("pending_purchase_receipt_view")
-    .select("*")
+    .select("*", { count: "exact" })
     .eq("organization_id", organizationId)
     .eq("created_by", access.userId)
-    .limit(100);
+    .order("document_id"));
   if (pending.error)
     throw new Error("Could not load pending receiving records.");
-  const [vendors, mappings, orders, lines, locations] = await Promise.all([
-    db
+  let orderQuery = db.from("purchase_order_summary").select("*", { count: "exact" }).eq("organization_id", organizationId).order("created_at", { ascending: false }).order("id", { ascending: false });
+  if (record) orderQuery = orderQuery.eq("id", record);
+  else {
+    if (list.status) orderQuery = orderQuery.eq("status", list.status);
+    if (list.q) orderQuery = /^(?:PO-)?\d+$/i.test(list.q) ? orderQuery.eq("number", Number(list.q.replace(/^PO-/i, ""))) : orderQuery.or(orSearch(["reason","vendor_name"],list.q));
+  }
+  const [vendors, mappings, orders, locations] = await Promise.all([
+    readAll(db
       .from("vendors")
-      .select("id,name,is_active")
+      .select("id,name,is_active", { count: "exact" })
       .eq("organization_id", organizationId)
       .order("name")
-      .limit(500),
-    db
+      .order("id")),
+    access.canPurchase && selectedVendor && isUuid(selectedVendor) ? readAll(db
       .from("vendor_item_master")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("organization_id", organizationId)
-      .eq("is_active", true)
+      .eq("is_active", true).eq("vendor_id", selectedVendor)
       .order("item_name")
-      .limit(1000),
-    db
-      .from("purchase_order_summary")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .order("created_at", { ascending: false })
-      .limit(50),
-    db
-      .from("purchase_order_line_view")
-      .select("*")
-      .eq("organization_id", organizationId)
-      .limit(1000),
+      .order("id")) : {data: [], error: null},
+    orderQuery.range(record ? 0 : list.from, record ? 0 : list.to),
     db
       .from("locations")
       .select("id,name")
@@ -69,10 +73,12 @@ export default async function PurchasingPage({
     vendors.error ||
     mappings.error ||
     orders.error ||
-    lines.error ||
     locations.error
   )
     throw new Error("Could not load purchasing.");
+  if (record && !orders.data.length) notFound();
+  const lines = record && orders.data.length ? await readAll(db.from("purchase_order_line_view").select("*", { count: "exact" }).eq("organization_id", organizationId).eq("order_id", record).order("id")) : { data: [], error: null };
+  if (lines.error || (record && orders.data.some(o => lines.data.filter(l => l.order_id === o.id).length !== o.line_count))) throw new Error("Complete purchase order details could not be loaded. Refresh before approving or receiving.");
   const vendor = vendors.data.find(
     (v) => v.id === selectedVendor && v.is_active,
   );
@@ -150,8 +156,8 @@ export default async function PurchasingPage({
             ))}
           </section>
         )}
-        {access.canPurchase && (
-          <section className="panel inventory-form-panel">
+        {access.canPurchase && !record && (
+          <section className="panel inventory-form-panel" id="new-order">
             <h2>New purchase order</h2>
             <p className="field-help">
               You are creating this order with your assigned Procurement duty.
@@ -179,7 +185,7 @@ export default async function PurchasingPage({
               (supplierItems.length ? (
                 <>
                   <h3>{vendor.name}</h3>
-                  <div className="inventory-table-wrap">
+                  <ResponsiveTable label="Purchase order lines">
                     <table className="inventory-table">
                       <thead>
                         <tr>
@@ -207,7 +213,7 @@ export default async function PurchasingPage({
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </ResponsiveTable>
                   <BusinessForm
                     key={vendor.id}
                     organizationId={organizationId}
@@ -243,12 +249,14 @@ export default async function PurchasingPage({
           </section>
         )}
         <section className="panel">
-          <h2>Latest 50 purchase orders</h2>
+          <h2>{record ? "Purchase order details" : "Purchase orders"}</h2>
+          {record ? <Link className="text-link" href={recordHref(`${base}/purchasing`,query)}>Back to purchase orders</Link> : <ListControls query={query} total={orders.count ?? 0} statuses={["draft", "submitted", "approved", "rejected", "cancelled"]} label="purchase orders" />}
           {!selectedVendor && <LiveInventoryRefresh />}
           {orders.data.length === 0 && (
             <p className="inventory-empty">No orders yet.</p>
           )}
-          {orders.data.map((order) => {
+          {!record && <ResponsiveTable label="Purchase orders" localControls={false}><table className="inventory-table"><thead><tr><th>Reference</th><th>Vendor</th><th>Expected delivery</th><th>Order value (NGN)</th><th>Lines</th><th>Status</th><th>Action</th></tr></thead><tbody>{orders.data.map(order=><tr key={order.id}><td>PO-{order.number}<small>{order.reason}</small></td><td>{order.vendor_name}</td><td>{order.expected_date??"Not specified"}</td><td>{formatAmount(order.total_value)}</td><td>{order.line_count}</td><td>{order.status==='approved'&&order.outstanding_lines===0?'Fulfilled':order.status}</td><td><Link className="text-link" href={recordHref(`${base}/purchasing`,query,order.id)}>Open PO-{order.number}</Link></td></tr>)}</tbody></table></ResponsiveTable>}
+          {(record ? orders.data : []).map((order) => {
             const orderLines = lines.data.filter(
               (l) => l.order_id === order.id,
             );
@@ -274,11 +282,12 @@ export default async function PurchasingPage({
                   </span>
                 </div>
                 <p>{order.reason}</p>
+                {!record && <Link className="text-link" href={`${base}/purchasing?record=${order.id}`}>Open {reference}</Link>}
                 <p className="field-help">
                   Order value: NGN {formatAmount(order.total_value ?? "0")} ·
                   Expected: {order.expected_date ?? "Not specified"}
                 </p>
-                <div className="inventory-table-wrap">
+                <ResponsiveTable label="Purchase order lines">
                   <table className="inventory-table">
                     <thead>
                       <tr>
@@ -312,7 +321,7 @@ export default async function PurchasingPage({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ResponsiveTable>
                 {order.status === "draft" &&
                   order.created_by === access.userId && (
                     <BusinessForm

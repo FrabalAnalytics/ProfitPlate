@@ -45,7 +45,8 @@ export type OperationIntent =
   | "suspend_member"
   | "reactivate_member"
   | "supersede_conversion"
-  | "retire_conversion";
+  | "retire_conversion"
+  | "update_item";
 export async function operate(
   organizationId: string,
   intent: OperationIntent,
@@ -124,7 +125,7 @@ export async function operate(
                     ? { reason: value("reason") }
                     : {}),
                 };
-        const { error } = await supabase.rpc("control_command", {
+        const { data, error } = await supabase.rpc("control_command", {
           p_command: intent,
           p_request_id: requestId,
           p_organization_id: organizationId,
@@ -133,7 +134,7 @@ export async function operate(
         if (error) throw error;
         destination = ["assign_duty", "remove_duty"].includes(intent)
           ? "team"
-          : "counts";
+          : `counts?record=${data && typeof data === "object" && !Array.isArray(data) && typeof data.id === "string" ? data.id : value("id")}`;
         break;
       }
       case "reconcile":
@@ -326,7 +327,7 @@ export async function operate(
         destination = "masters?view=menu";
         break;
       case "create_purchase_order":
-        await runBusinessCommand(
+        const createdOrder = await runBusinessCommand(
           supabase,
           organizationId,
           intent,
@@ -340,7 +341,7 @@ export async function operate(
           },
           requestId,
         );
-        destination = "purchasing";
+        destination = `purchasing?record=${createdOrder.id}`;
         break;
       case "submit_purchase_order":
       case "approve_purchase_order":
@@ -351,7 +352,7 @@ export async function operate(
           { id: value("id") },
           requestId,
         );
-        destination = "purchasing";
+        destination = `purchasing?record=${value("id")}`;
         break;
       case "reject_purchase_order":
       case "cancel_purchase_order":
@@ -362,7 +363,7 @@ export async function operate(
           { id: value("id"), reason: value("reason") },
           requestId,
         );
-        destination = "purchasing";
+        destination = `purchasing?record=${value("id")}`;
         break;
       case "create_purchase_receipt": {
         const rejected = form.getAll("line_rejected_quantity");
@@ -383,7 +384,7 @@ export async function operate(
           },
           requestId,
         );
-        destination = "purchasing?received=1";
+        destination = `purchasing?record=${value("id")}&received=1`;
         break;
       }
       case "accept_purchase_receipt": {
@@ -398,7 +399,7 @@ export async function operate(
         break;
       }
       case "create_requisition":
-        await runBusinessCommand(
+        const createdRequest = await runBusinessCommand(
           supabase,
           organizationId,
           intent,
@@ -412,7 +413,7 @@ export async function operate(
           },
           requestId,
         );
-        destination = "requests";
+        destination = `requests?record=${createdRequest.id}`;
         break;
       case "submit_requisition":
       case "approve_requisition":
@@ -423,7 +424,7 @@ export async function operate(
           { id: value("id") },
           requestId,
         );
-        destination = "requests";
+        destination = `requests?record=${value("id")}`;
         break;
       case "reject_requisition":
       case "close_requisition":
@@ -434,7 +435,7 @@ export async function operate(
           { id: value("id"), reason: value("reason") },
           requestId,
         );
-        destination = "requests";
+        destination = `requests?record=${value("id")}`;
         break;
       case "fulfil_requisition":
         await runBusinessCommand(
@@ -452,7 +453,7 @@ export async function operate(
           },
           requestId,
         );
-        destination = "requests";
+        destination = `requests?record=${value("id")}`;
         break;
       case "create_sales_draft":
         return { error: "Use the validated sales import screen." };
@@ -558,6 +559,10 @@ export async function operate(
           },
           requestId,
         );
+        break;
+      case "update_item":
+        await runDatabaseCommand(supabase, "update_item", organizationId, { id: value("id"), name: value("name"), sku: value("sku"), is_active: value("is_active") === "true" }, requestId);
+        destination = `items/${value("id")}`;
         break;
       case "create_item":
         await runInventoryCommand(
@@ -844,6 +849,7 @@ export async function operate(
     };
   }
   revalidatePath(`/workspace/${organizationId}`, "layout");
+  if (intent === "revise_recipe" && value("return_to") === "recipe_details" && isUuid(value("id"))) destination = `recipes/${value("id")}`;
   if (
     value("return_to") === "sales_review" &&
     isUuid(value("id")) &&
@@ -857,7 +863,7 @@ export async function operate(
     value("return_to") === "requests"
   )
     destination = "requests";
-  if (destination === "requests") destination = `requests?completed=${intent}`;
+  if (destination?.startsWith("requests")) destination = `${destination}${destination.includes("?") ? "&" : "?"}completed=${intent}`;
   if (
     ["appoint_manager", "remove_manager"].includes(intent) &&
     value("return_to") === "team"

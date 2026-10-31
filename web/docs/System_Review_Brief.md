@@ -1,6 +1,6 @@
 # Overall system review brief
 
-Recorded: 31 October 2026. The overall review is planned for a later task.
+Recorded: 31 October 2026. The initial review is complete; see [the findings and implementation sequence](System_Review_2026-10-31.md) and [implemented fixes and verification](System_Review_Fixes_2026-10-31.md).
 
 The product owner's standard is world-class software: easy navigation, polished UI, and clearly organized data, particularly in tables.
 

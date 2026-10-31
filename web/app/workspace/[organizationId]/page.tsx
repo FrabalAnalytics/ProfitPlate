@@ -61,6 +61,8 @@ export default async function WorkspaceHome({
         </span>
       </div>
       <RoleWorkspace organizationId={organizationId} />
+      <details className="setup-history" open={completed < 3}>
+      <summary>{completed === 3 ? "Setup complete · View business details" : "Finish business setup"}</summary>
       <section className="welcome-banner">
         <div>
           <span className="eyebrow">ONE STEP AT A TIME</span>
@@ -124,7 +126,7 @@ export default async function WorkspaceHome({
             },
             {
               label: "Build your item catalogue",
-              detail: `${items.count || 0} active inventory items defined.`,
+              detail: `${items.count || 0} active inventory ${items.count === 1 ? "item" : "items"} defined.`,
               done: Boolean(items.count),
               href: `/workspace/${organizationId}/inventory`,
             },
@@ -200,6 +202,7 @@ export default async function WorkspaceHome({
           from the same information.
         </p>
       </div>
+      </details>
     </>
   );
 }

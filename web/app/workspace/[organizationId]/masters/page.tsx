@@ -1,3 +1,5 @@
+import { readAll } from "@/lib/read-all";
+import { ResponsiveTable } from "@/components/responsive-table";
 import { formatInventoryNumber, formatAmount } from "@/lib/inventory-format";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -39,12 +41,12 @@ export default async function MastersPage({
   let content: React.ReactNode;
   if (view === "vendors") {
     if (!access.canReadVendors) notFound();
-    const { data: vendors, error } = await db
+    const { data: vendors, error } = await readAll(db
       .from("vendors")
-      .select("*")
+      .select("*", {count:"exact"})
       .eq("organization_id", organizationId)
       .order("name")
-      .limit(500);
+      .order("id"));
     if (error) throw new Error("Could not load vendors.");
     const vendor = vendors.find((v) => v.id === edit);
     content = (
@@ -58,7 +60,7 @@ export default async function MastersPage({
           {vendors.length === 0 ? (
             <p>No vendors yet.</p>
           ) : (
-            <div className="inventory-table-wrap">
+            <ResponsiveTable label="Master records">
               <table className="inventory-table">
                 <thead>
                   <tr>
@@ -95,7 +97,7 @@ export default async function MastersPage({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTable>
           )}
         </section>
         {access.canPurchase && (
@@ -143,26 +145,26 @@ export default async function MastersPage({
   } else if (view === "vendor_items") {
     if (!access.canReadVendors) notFound();
     const [mappings, vendors, items] = await Promise.all([
-      db
+      readAll(db
         .from("vendor_item_master")
-        .select("*")
+        .select("*", {count:"exact"})
         .eq("organization_id", organizationId)
         .order("vendor_name")
         .order("item_name")
-        .limit(500),
+        .order("id")),
       db
         .from("vendors")
         .select("id,name")
         .eq("organization_id", organizationId)
         .eq("is_active", true)
         .order("name"),
-      db
+      readAll(db
         .from("items")
-        .select("id,name,sku,base_uom_code,stock_unit_label,category")
+        .select("id,name,sku,base_uom_code,stock_unit_label,category", {count:"exact"})
         .eq("organization_id", organizationId)
         .eq("is_active", true)
         .order("name")
-        .limit(500),
+        .order("id")),
     ]);
     if (mappings.error || vendors.error || items.error)
       throw new Error("Could not load supplier items.");
@@ -175,7 +177,7 @@ export default async function MastersPage({
             Record verified purchase packs explicitly. A supplier quote does not
             change stock, last purchase price or weighted average cost.
           </p>
-          <div className="inventory-table-wrap">
+          <ResponsiveTable label="Master records">
             <table className="inventory-table">
               <thead>
                 <tr>
@@ -220,7 +222,7 @@ export default async function MastersPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTable>
           {!mappings.data.length && (
             <p className="inventory-empty">
               Add a vendor, then link the items you buy from them.
@@ -295,18 +297,18 @@ export default async function MastersPage({
     );
   } else if (view === "menu") {
     const [menus, recipes] = await Promise.all([
-      db
+      readAll(db
         .from("menu_items")
-        .select("*")
+        .select("*", {count:"exact"})
         .eq("organization_id", organizationId)
         .order("name")
-        .limit(500),
-      db
+        .order("id")),
+      readAll(db
         .from("final_recipe_master")
-        .select("id,name,code")
+        .select("id,name,code", {count:"exact"})
         .eq("organization_id", organizationId)
         .order("name")
-        .limit(500),
+        .order("id")),
     ]);
     if (menus.error || recipes.error)
       throw new Error("Could not load menu mapping.");
@@ -323,7 +325,7 @@ export default async function MastersPage({
             are configured, imports must use active mappings. Mapping changes do
             not rewrite posted sales; pending drafts must be validated again.
           </p>
-          <div className="inventory-table-wrap">
+          <ResponsiveTable label="Master records">
             <table className="inventory-table">
               <thead>
                 <tr>
@@ -360,7 +362,7 @@ export default async function MastersPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTable>
         </section>
         {canEdit && (
           <section className="panel inventory-form-panel">
@@ -414,19 +416,19 @@ export default async function MastersPage({
   } else if (view === "units") {
     const [units, conversions, items] = await Promise.all([
       db.from("units_of_measure").select("code,dimension").order("code"),
-      db
+      readAll(db
         .from("item_conversion_history")
-        .select("*")
+        .select("*", {count:"exact"})
         .eq("organization_id", organizationId)
         .order("created_at", { ascending: false })
-        .limit(100),
-      db
+        .order("id")),
+      readAll(db
         .from("items")
-        .select("id,name,sku,base_uom_code,stock_unit_label")
+        .select("id,name,sku,base_uom_code,stock_unit_label", {count:"exact"})
         .eq("organization_id", organizationId)
         .eq("is_active", true)
         .order("name")
-        .limit(500),
+        .order("id")),
     ]);
     if (units.error || conversions.error || items.error)
       throw new Error("Could not load units.");
@@ -439,7 +441,7 @@ export default async function MastersPage({
             Bottle, pack, roll and portion labels retain their own counted-stock
             identity. No packaging or density factor is inferred from names.
           </p>
-          <div className="inventory-table-wrap">
+          <ResponsiveTable label="Master records">
             <table className="inventory-table">
               <thead>
                 <tr>
@@ -467,7 +469,7 @@ export default async function MastersPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTable>
         </section>
         {["owner", "admin", "inventory_manager"].includes(
           access.primaryRole,
@@ -567,19 +569,19 @@ export default async function MastersPage({
         </div>
       </div>
       <nav className="inventory-tabs" aria-label="Master data sections">
-        <Link href={`${base}/masters`}>Overview</Link>
+        <Link href={`${base}/masters`} aria-current={view === "overview" ? "page" : undefined}>Overview</Link>
         {access.canReadVendors && (
           <>
-            <Link href={`${base}/masters?view=vendors`}>Vendors</Link>
-            <Link href={`${base}/masters?view=vendor_items`}>
+            <Link href={`${base}/masters?view=vendors`} aria-current={view === "vendors" ? "page" : undefined}>Vendors</Link>
+            <Link href={`${base}/masters?view=vendor_items`} aria-current={view === "vendor_items" ? "page" : undefined}>
               Supplier items
             </Link>
           </>
         )}
         <Link href={`${base}/inventory?view=final_recipes`}>Final recipes</Link>
         <Link href={`${base}/inventory?view=sub_recipes`}>Sub-recipes</Link>
-        <Link href={`${base}/masters?view=menu`}>Menu mapping</Link>
-        <Link href={`${base}/masters?view=units`}>Units</Link>
+        <Link href={`${base}/masters?view=menu`} aria-current={view === "menu" ? "page" : undefined}>Menu mapping</Link>
+        <Link href={`${base}/masters?view=units`} aria-current={view === "units" ? "page" : undefined}>Units</Link>
       </nav>
       {saved && (
         <p className="notice notice-success location-notice" role="status">

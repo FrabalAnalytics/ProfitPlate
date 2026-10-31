@@ -56,7 +56,7 @@ export function previousReportPeriod(start: string, end: string) {
     last = new Date(`${end}T00:00:00Z`);
   const following = new Date(last);
   following.setUTCDate(following.getUTCDate() + 1);
-  if (first.getUTCDate() === 1 && following.getUTCDate() === 1) {
+  if (first.getUTCDate() === 1 && following.getUTCDate() === 1 && first.getUTCFullYear() === last.getUTCFullYear() && first.getUTCMonth() === last.getUTCMonth()) {
     first.setUTCMonth(first.getUTCMonth() - 1);
     last.setUTCDate(0);
   } else {
@@ -87,18 +87,22 @@ export function reportPeriod(
       !Number.isNaN(Date.parse(s)) &&
       new Date(s).toISOString().slice(0, 10) === s,
     );
+  if (start && !valid(start)) throw new Error("Enter a valid reference or start date.");
+  const mode = cadence ?? (end ? "custom" : "daily");
+  if (!["daily", "weekly", "monthly", "custom"].includes(mode)) throw new Error("Choose a supported report cycle.");
+  if (mode === "custom" && (!end || !valid(end))) throw new Error("Enter a valid end date for the custom range.");
   const reference = valid(start) ? start! : today;
   let first = reference,
-    last = valid(end) ? end! : reference;
-  if (!valid(end)) {
+    last = mode === "custom" ? end! : reference;
+  if (mode !== "custom") {
     const d = new Date(`${reference}T00:00:00Z`);
-    if (cadence === "weekly") {
+    if (mode === "weekly") {
       d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
       first = d.toISOString().slice(0, 10);
       d.setUTCDate(d.getUTCDate() + 6);
       last = d.toISOString().slice(0, 10);
     }
-    if (cadence === "monthly") {
+    if (mode === "monthly") {
       d.setUTCDate(1);
       first = d.toISOString().slice(0, 10);
       d.setUTCMonth(d.getUTCMonth() + 1);
@@ -106,5 +110,7 @@ export function reportPeriod(
       last = d.toISOString().slice(0, 10);
     }
   }
+  if (first > last) throw new Error("The end date must be on or after the start date.");
+  if ((Date.parse(last) - Date.parse(first)) / 86400000 > 366) throw new Error("Choose a report range of at most 367 days.");
   return { start: first, end: last };
 }

@@ -44,6 +44,7 @@ export const workspaceRole = cache(async (organizationId: string) => {
     isManager,
     isOwner: membership.role === "owner",
     canTeam: ["owner", "admin"].includes(membership.role),
+    canAudit: roles.some(r => ["owner", "admin", "accountant"].includes(r)),
     canStock,
     canPurchase,
     canFinance,

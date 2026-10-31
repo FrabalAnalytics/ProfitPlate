@@ -1,3 +1,7 @@
+import { ResponsiveTable } from "@/components/responsive-table";
+import { ReportFilters } from "@/components/report-filters";
+import { ListControls } from "@/components/list-controls";
+import { listState } from "@/lib/list-query";
 import styles from "@/components/report-layout.module.css";
 import { formatInventoryNumber, formatAmount } from "@/lib/inventory-format";
 import Link from "next/link";
@@ -30,6 +34,9 @@ export default async function ReportsPage({
     snapshot?: string;
     saved?: string;
     section?: string;
+    page?: string;
+    q?: string;
+    status?: string;
   }>;
 }) {
   const { organizationId } = await params;
@@ -50,12 +57,12 @@ export default async function ReportsPage({
   const sectionLink = (section: string) => {
     const search = new URLSearchParams();
     for (const [key, value] of Object.entries(query))
-      if (typeof value === "string" && key !== "saved" && key !== "section")
+      if (typeof value === "string" && !["saved", "section", "page", "q", "status"].includes(key))
         search.set(key, value);
     search.set("section", section);
     return `/workspace/${organizationId}/reports?${search}`;
   };
-  const period = reportPeriod(query.start, query.end, query.cadence);
+  const list = listState(query);
   const db = await createSupabaseServerClient();
   const base = `/workspace/${organizationId}`;
   const locations = await db
@@ -69,6 +76,11 @@ export default async function ReportsPage({
   );
   if (query.location && !allowedLocations.some((l) => l.id === query.location))
     notFound();
+  let period;
+  try { period = reportPeriod(query.start, query.end, query.cadence); }
+  catch (error) {
+    return <div className={styles.report}><div className="page-heading"><h1>Reports</h1></div><ReportFilters key={JSON.stringify(query)} section={activeSection} start={query.start ?? reportPeriod(undefined, undefined, undefined).start} end={query.end} cadence={query.cadence} location={query.location} locations={allowedLocations} wholeBusiness={!access.departmentLocation} error={error instanceof Error ? error.message : "Choose a valid date range."} /></div>;
+  }
   let report;
   let selected:
     | { id: string; revision: number; reason: string; created_at: string }
@@ -98,22 +110,22 @@ export default async function ReportsPage({
   }
   const [snapshots, reconciliations] = access.canFinance
     ? await Promise.all([
-        db
+        activeSection === "published" ? db
           .from("report_snapshots")
-          .select("id,starts_on,ends_on,revision,created_at")
+          .select("id,starts_on,ends_on,revision,created_at", { count: "exact" })
           .eq("organization_id", organizationId)
           .order("created_at", { ascending: false })
-          .limit(30),
-        db
+          .order("id", { ascending: false }).range(list.from, list.to) : {data: [], error: null, count: 0},
+        activeSection === "finance" ? db
           .from("report_reconciliations")
-          .select("*")
+          .select("*", { count: "exact" })
           .eq("organization_id", organizationId)
           .order("created_at", { ascending: false })
-          .limit(30),
+          .order("id", { ascending: false }).range(list.from, list.to) : {data: [], error: null, count: 0},
       ])
     : [
-        { data: [], error: null },
-        { data: [], error: null },
+        { data: [], error: null, count: 0 },
+        { data: [], error: null, count: 0 },
       ];
   if (snapshots.error || reconciliations.error)
     throw new Error("Could not load saved reports.");
@@ -122,19 +134,19 @@ export default async function ReportsPage({
     : "Whole business, including stock in transit";
   const sales = report.sales;
   const [actionRows, people] = await Promise.all([
-    db
+    activeSection === "actions" ? db
       .from("management_actions")
-      .select("*")
+      .select("*", { count: "exact" })
       .eq("organization_id", organizationId)
       .order("created_at", { ascending: false })
-      .limit(50),
-    db.rpc("operating_people", { p_organization_id: organizationId }),
+      .order("id", { ascending: false }).range(list.from, list.to) : {data: [], error: null, count: 0},
+    activeSection === "actions" ? db.rpc("operating_people", { p_organization_id: organizationId }) : {data: [], error: null},
   ]);
   if (actionRows.error || people.error)
     throw new Error("Could not load management actions.");
   let previous: ReturnType<typeof readReport> | undefined;
   const previousPeriod = previousReportPeriod(report.starts_on, report.ends_on);
-  if (report.finance && !selected) {
+  if (report.finance && !selected && activeSection === "overview") {
     const result = await db.rpc("operating_report", {
       p_organization_id: organizationId,
       p_starts_on: previousPeriod.start,
@@ -165,58 +177,7 @@ export default async function ReportsPage({
           · {report.readiness}
         </span>
       </div>
-      <form className={styles.filters} method="get">
-        <input type="hidden" name="section" value={activeSection} />
-        <div className="field">
-          <label htmlFor="report-cadence">Report cycle</label>
-          <select
-            id="report-cadence"
-            name="cadence"
-            defaultValue={query.cadence ?? "daily"}
-          >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly (Monday–Sunday)</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="report-start">Reference / start date</label>
-          <input
-            id="report-start"
-            name="start"
-            type="date"
-            defaultValue={report.starts_on}
-            required
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="report-end">End date (optional custom range)</label>
-          <input
-            id="report-end"
-            name="end"
-            type="date"
-            defaultValue={query.end ?? ""}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="report-location">Location</label>
-          <select
-            id="report-location"
-            name="location"
-            defaultValue={report.location_id ?? ""}
-          >
-            {!access.departmentLocation && (
-              <option value="">Whole business</option>
-            )}
-            {allowedLocations.map((l) => (
-              <option key={l.id} value={l.id}>
-                {l.name}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button className="button button-primary">View report</button>
-      </form>
+      <ReportFilters key={JSON.stringify(query)} section={activeSection} start={report.starts_on} end={query.end ?? (selected ? report.ends_on : undefined)} cadence={query.cadence} location={report.location_id} locations={allowedLocations} wholeBusiness={!access.departmentLocation} />
       <section className={styles.context} aria-label="Report context">
         <div>
           <h2>
@@ -251,7 +212,7 @@ export default async function ReportsPage({
               Publication reason: {selected.reason}. This snapshot is immutable.{" "}
               <Link
                 className="text-link"
-                href={`${base}/reports?start=${report.starts_on}&end=${report.ends_on}`}
+                href={`${base}/reports?start=${report.starts_on}&end=${report.ends_on}${report.location_id ? `&location=${report.location_id}` : ""}`}
               >
                 View current evidence
               </Link>
@@ -388,11 +349,11 @@ export default async function ReportsPage({
         <section className={styles.card}>
           <h2>Operational overview</h2>
           <p>
-            {report.inventory.length} item/location balances ?{" "}
+            {report.inventory.length} item/location balances ·{" "}
             {report.posted_sales_lines} posted sales lines
           </p>
           <p>
-            {report.pending_documents} stock records pending ?{" "}
+            {report.pending_documents} stock records pending ·{" "}
             {report.late_movement_entries} late movement entries
           </p>
           <Link className="text-link" href={sectionLink("inventory")}>
@@ -406,13 +367,13 @@ export default async function ReportsPage({
           <p>
             {previous.starts_on} to {previous.ends_on} · {previous.readiness}
           </p>
-          <div className="inventory-table-wrap">
+          <ResponsiveTable label="Report details">
             <table className="inventory-table">
               <thead>
                 <tr>
                   <th>Measure</th>
-                  <th>Selected period</th>
-                  <th>Previous period</th>
+                  <th className="numeric">Selected period</th>
+                  <th className="numeric">Previous period</th>
                 </tr>
               </thead>
               <tbody>
@@ -430,7 +391,7 @@ export default async function ReportsPage({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTable>
           <p>
             Unavailable comparison evidence is not treated as zero. Published
             snapshots retain their own selected-period figures; this comparison
@@ -446,7 +407,7 @@ export default async function ReportsPage({
             {!report.inventory.length ? (
               <p>No posted inventory evidence for this period and location.</p>
             ) : (
-              <div className="inventory-table-wrap">
+              <ResponsiveTable label="Report details">
                 <table className="inventory-table">
                   <thead>
                     <tr>
@@ -483,7 +444,7 @@ export default async function ReportsPage({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </ResponsiveTable>
             )}
           </section>
           <section className="panel">
@@ -526,6 +487,7 @@ export default async function ReportsPage({
       {activeSection === "actions" && (
         <section className={styles.card}>
           <h2>Live management actions</h2>
+          <ListControls query={query} total={actionRows.count ?? 0} label="management actions" searchable={false} />
           <p>
             Assigned findings and follow-up work. Updating an action never posts
             stock or changes a published report.
@@ -680,6 +642,7 @@ export default async function ReportsPage({
             {activeSection === "finance" && (
               <section className={styles.card}>
                 <h2>Accounting reconciliations</h2>
+                <ListControls query={query} total={reconciliations.count ?? 0} label="reconciliations" searchable={false} />
                 {!reconciliations.data?.length && (
                   <p>
                     No reconciliations yet. Actual COGS and gross margin remain
@@ -750,6 +713,7 @@ export default async function ReportsPage({
             {activeSection === "published" && (
               <section className={styles.card}>
                 <h2>Published reports</h2>
+                <ListControls query={query} total={snapshots.count ?? 0} label="saved reports" searchable={false} />
                 {!snapshots.data?.length && <p>No saved snapshots yet.</p>}
                 {snapshots.data?.map((s) => (
                   <article className="inventory-document" key={s.id}>

@@ -181,7 +181,7 @@ export async function RoleWorkspace({
       [
         "Manage team access",
         "team",
-        "Invite test users and assign their working roles.",
+        "Invite team members and assign their working roles.",
       ],
       [
         "Maintain master data",
@@ -213,6 +213,9 @@ export async function RoleWorkspace({
         "Read shared recipe definitions and costs.",
       ],
     ];
+  if (access.canPurchase && access.primaryRole !== "procurement_officer") actions.push(["Prepare a purchase order", "purchasing#new-order", "Use your assigned Procurement duty to prepare an order for independent review."]);
+  if (access.canStock && access.primaryRole !== "inventory_manager" && !access.isManager) actions.push(["Receive ordered goods", "purchasing", "Use your assigned Inventory duty to accept goods against an approved order."]);
+  if (access.canAudit) actions.push(["Trace changes and approvals", "audit", "Search the recorded actors, changes and decisions for this business."]);
   return (
     <section aria-label="Daily workspace" className="daily-workspace">
       <div className="panel-heading">
@@ -240,7 +243,7 @@ export async function RoleWorkspace({
         {actions.map(([title, path, detail]) => (
           <Link
             className="panel role-action"
-            key={path}
+            key={`${title}-${path}`}
             href={`${base}/${path}`}
           >
             <h2>{title}</h2>
@@ -250,10 +253,10 @@ export async function RoleWorkspace({
         ))}
       </div>
       <div className="role-queue-strip">
-        <span>{stock.count ?? 0} stock documents awaiting review</span>
-        <span>{requests.count ?? 0} stock requests awaiting review</span>
+        <Link href={`${base}/${access.isManager ? "approvals" : "inventory?view=documents&status=submitted"}`}>{stock.count ?? 0} stock documents awaiting review</Link>
+        <Link href={`${base}/${access.isManager ? "approvals" : "requests?status=submitted"}`}>{requests.count ?? 0} stock requests awaiting review</Link>
         {access.canReadVendors && (
-          <span>{orders.count ?? 0} purchase orders awaiting review</span>
+          <Link href={`${base}/${access.isManager ? "approvals" : "purchasing?status=submitted"}`}>{orders.count ?? 0} purchase orders awaiting review</Link>
         )}
       </div>
     </section>
